@@ -62,22 +62,73 @@ function normalize(text){
 return text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu," ").trim();
 }
 
-function answer(question){
-const q=normalize(question);
-let best=null,score=0;
-for(const item of knowledge){
-let s=0;
-for(const keyword of item.keywords){
-const k=normalize(keyword);
-if(q.includes(k))s+=k.includes(" ")?4:2;
+
+function answer(question) {
+  const q = normalize(question);
+  if (!q) return "Silakan tuliskan pertanyaan kamu.";
+
+  const stopWords = new Set([
+    "apa", "apakah", "itu", "yang", "dan", "atau",
+    "di", "ke", "dari", "untuk", "dengan", "tentang",
+    "bagaimana", "cara", "saya", "bisa", "dapat",
+    "ada", "ndc", "learning", "nava"
+  ]);
+
+  function words(text) {
+    return normalize(text)
+      .split(/\s+/)
+      .filter(w => w.length > 1 && !stopWords.has(w));
+  }
+
+  const queryWords = [...new Set(words(question))];
+  let best = null;
+  let highestScore = 0;
+
+  for (const item of knowledge) {
+    const title = normalize(item.title || "");
+    const titleWords = [...new Set(words(item.title || ""))];
+    const keywords = item.keywords || [];
+    let score = 0;
+
+    // Prioritaskan judul pertanyaan yang sama
+    if (q === title) score += 100;
+
+    // Cocokkan kata penting dalam judul
+    const titleMatches = queryWords.filter(w =>
+      titleWords.includes(w)
+    ).length;
+
+    if (queryWords.length && titleMatches === queryWords.length) {
+      score += 25;
+    }
+
+    score += titleMatches * 5;
+
+    // Cocokkan kata kunci spesifik
+    for (const keyword of keywords) {
+      const k = normalize(keyword);
+      if (!k) continue;
+
+      if (q === k) {
+        score += 30;
+      } else if (k.length >= 5 && q.includes(k)) {
+        score += 12;
+      }
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      best = item;
+    }
+  }
+
+  if (!best || highestScore < 5) {
+    return "Maaf, saya belum menemukan jawaban yang sesuai dalam basis pengetahuan NDC Learning. Coba gunakan pertanyaan yang lebih spesifik.";
+  }
+
+  return best.answer;
 }
-if(s>score){score=s;best=item;}
-}
-if(!best||score===0){
-return "Maaf, saya belum menemukan informasi tersebut dalam modul pengetahuan NDC Learning. Silakan tanyakan tentang program, webinar, simulasi industri, soft skill, atau pengembangan karier.";
-}
-return best.answer;
-}
+
 
 function send(value){
 const q=(value||input.value).trim();
